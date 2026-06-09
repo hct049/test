@@ -89,6 +89,21 @@ export default function Home() {
     }
   }
 
+  // ── upstream 동기화 ───────────────────────────────────────
+  async function syncUpstream() {
+    if (!confirm('hct049 원본 레포의 최신 코드를 가져옵니다. 계속할까요?')) return;
+    setBusy(true);
+    try {
+      const res  = await fetch('/api/sync-upstream', { method: 'POST' });
+      const data = await res.json();
+      showToast(data.ok ? 'success' : 'error', data.message);
+    } catch (err) {
+      showToast('error', err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // ── 글 저장 ──────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
@@ -219,6 +234,7 @@ export default function Home() {
               ⚠️ 전체 삭제
             </button>
             <button className="btn btn-cyan"   disabled={busy} onClick={loadData}>🔄 새로고침</button>
+            <button className="btn btn-ghost"  disabled={busy} onClick={syncUpstream}>⬇️ upstream 동기화</button>
           </div>
         )}
 
