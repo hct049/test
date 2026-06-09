@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export default function Home() {
+  const [mounted, setMounted]     = useState(false);
   const [rows, setRows]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [loggedIn, setLoggedIn]   = useState(false);
   const [userId, setUserId]       = useState('');
-  const [modal, setModal]         = useState(false);   // 로그인 모달
+  const [modal, setModal]         = useState(false);
   const [form, setForm]           = useState({ id: '', password: '' });
   const [loginErr, setLoginErr]   = useState('');
-  const [toast, setToast]         = useState(null);    // { type, msg }
+  const [toast, setToast]         = useState(null);
   const [addForm, setAddForm]     = useState({ name: '', email: '', message: '' });
   const [busy, setBusy]           = useState(false);
 
@@ -26,8 +27,9 @@ export default function Home() {
     }
   }, []);
 
-  // ── 세션 확인 ────────────────────────────────────────────
+  // ── 마운트 + 세션 확인 ───────────────────────────────────
   useEffect(() => {
+    setMounted(true);
     fetch('/api/me').then(r => r.json()).then(d => {
       setLoggedIn(d.loggedIn);
       setUserId(d.id || '');
@@ -108,6 +110,9 @@ export default function Home() {
     const d = new Date(ts);
     return isNaN(d) ? ts : d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
   }
+
+  // SSR과 클라이언트 첫 렌더를 일치시켜 hydration 오류 방지
+  if (!mounted) return null;
 
   return (
     <>
