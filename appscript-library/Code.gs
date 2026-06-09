@@ -3,8 +3,33 @@
 //  배포: 배포 > 새 배포 > 유형: 라이브러리
 // ============================================================
 
-/** 라이브러리 연결 확인 */
-function ping() {
+/**
+ * 범용 디스패처 — action과 params를 받아 해당 함수를 실행합니다.
+ * test-Test는 이 함수만 호출하며 내부 함수 목록을 알 필요가 없습니다.
+ * @param {string} spreadsheetId
+ * @param {string} sheetName
+ * @param {string} action
+ * @param {Object} params
+ */
+function dispatch(spreadsheetId, sheetName, action, params) {
+  params = params || {};
+  switch (action) {
+    case 'ping':
+      return { status: 'ok', libraryPing: _ping(), pingError: '' };
+    case 'appendRow':
+      return appendRowToSheet(spreadsheetId, sheetName, params);
+    case 'deleteLastRow':
+      return deleteLastRow(spreadsheetId, sheetName);
+    case 'appendRandomRow':
+      return appendRandomRow(spreadsheetId, sheetName);
+    case 'clearAllData':
+      return clearAllData(spreadsheetId, sheetName);
+    default:
+      return { status: 'error', message: '알 수 없는 action: ' + action };
+  }
+}
+
+function _ping() {
   return 'pong from test-Library';
 }
 
