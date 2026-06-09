@@ -97,9 +97,11 @@
     <label for="message">메시지</label>
     <textarea id="message" placeholder="테스트 내용을 입력하세요"></textarea>
 
-    <button id="submitBtn" onclick="submitData()">스프레드시트에 저장</button>
+    <button id="pingBtn" onclick="pingTest()" style="background:#0891b2;margin-bottom:10px;">연결 테스트 (GET)</button>
+    <button id="submitBtn" onclick="submitData()">스프레드시트에 저장 (POST)</button>
 
     <div id="result"></div>
+    <pre id="rawResult" style="display:none;margin-top:12px;padding:12px;background:#1e1e2e;color:#cdd6f4;border-radius:8px;font-size:0.8rem;overflow-x:auto;white-space:pre-wrap;"></pre>
   </div>
 
   <script>
@@ -170,6 +172,39 @@
         btn.disabled = false;
         btn.textContent = '스프레드시트에 저장';
       }
+    }
+
+    async function pingTest() {
+      const gasUrl = getGasUrl();
+      if (!gasUrl) {
+        showResult('error', 'Apps Script URL이 설정되지 않았습니다.');
+        return;
+      }
+
+      const btn = document.getElementById('pingBtn');
+      btn.disabled = true;
+      btn.textContent = '요청 중...';
+
+      try {
+        const res  = await fetch(gasUrl);
+        const text = await res.text();
+        let pretty;
+        try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { pretty = text; }
+        showRaw(pretty);
+        showResult('success', '✅ GET 응답 수신 완료 (아래 확인)');
+      } catch (err) {
+        showResult('error', 'GET 요청 실패: ' + err.message);
+        showRaw(err.toString());
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '연결 테스트 (GET)';
+      }
+    }
+
+    function showRaw(text) {
+      const el = document.getElementById('rawResult');
+      el.textContent = text;
+      el.style.display = 'block';
     }
 
     function showResult(type, msg) {
