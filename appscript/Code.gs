@@ -15,11 +15,19 @@ var SHEET_NAME     = 'Sheet1';
 
 // ── GET 핸들러 (연결 테스트용) ────────────────────────────
 function doGet(e) {
-  var pingResult = SpreadLib.ping();
+  var pingResult = '';
+  var pingError  = '';
+  try {
+    pingResult = SpreadLib.ping();
+  } catch (err) {
+    pingError = err.toString();
+  }
+
   var output = {
-    status: 'ok',
-    message: 'Apps Script 정상 작동 중',
-    libraryPing: pingResult
+    status:      'ok',
+    message:     'Apps Script 정상 작동 중',
+    libraryPing: pingResult,
+    pingError:   pingError
   };
   return ContentService
     .createTextOutput(JSON.stringify(output))
