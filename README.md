@@ -1,43 +1,28 @@
-# Spreadsheet DB 테스트 페이지
+# Spreadsheet DB 테스트
 
-라이브러리 없이 스프레드시트에 직접 저장하는 테스트 구성입니다.
+## 환경 변수 (Vercel 프로젝트 설정에 등록)
+
+| 변수 | 설명 |
+|------|------|
+| `GAS_URL` | Apps Script 웹앱 배포 URL |
+| `ADMIN_ID` | 로그인 아이디 |
+| `ADMIN_PASSWORD` | 로그인 비밀번호 |
+| `SESSION_SECRET` | 세션 쿠키 서명 키 (랜덤 문자열) |
 
 ## 구조
 
 ```
-Vercel (jtrg0044) → GitHub → Apps Script (jtrg0044, 라이브러리 없음) → Spreadsheet (jtrg0044)
+브라우저
+  └─ /api/proxy (Vercel — GAS_URL은 여기서만 사용, 클라이언트에 노출 없음)
+       └─ Apps Script (test-Test) → SpreadLib.dispatch() → Spreadsheet
 ```
 
-## 배포 순서
+## Apps Script 배포 순서
 
-### 1. Apps Script 배포
+1. **test-Library**: `appscript/library_Code.gs` 붙여넣기 → 새 배포 > 라이브러리
+2. **test-Test**: `appscript/Test_Code.gs` 붙여넣기 → 라이브러리 추가 (식별자: `SpreadLib`) → 새 배포 > 웹앱
 
-1. [script.google.com](https://script.google.com) 접속 (jtrg0044 계정)
-2. 새 프로젝트 생성
-3. `appscript/Code.gs` 내용 붙여넣기
-4. `SPREADSHEET_ID` 변수를 본인 스프레드시트 ID로 교체
-5. **배포 > 새 배포** 클릭
-   - 유형: 웹 앱
-   - 다음 사용자로 실행: 나 (나의 계정)
-   - 액세스 권한: 모든 사용자 (익명 포함)
-6. 배포 후 **웹 앱 URL** 복사
+## 기능
 
-### 2. Vercel 배포
-
-1. GitHub에 push
-2. Vercel에서 이 레포 연결 → 자동 배포
-
-### 3. 테스트
-
-배포된 Vercel URL 접속 후 두 가지 방법으로 Apps Script URL 설정:
-
-**방법 A)** `index.html`의 `GAS_URL` 변수에 직접 입력 후 재배포
-
-**방법 B)** URL 파라미터로 전달 (재배포 없이 즉시 테스트 가능):
-```
-https://your-vercel-url.vercel.app/?gasUrl=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
-```
-
-## Apps Script 직접 테스트
-
-스크립트 에디터에서 `testAppend()` 함수를 직접 실행하면 라이브러리 없이 스프레드시트에 저장되는지 확인할 수 있습니다.
+- 미로그인: 시트 데이터 게시판 조회만 가능
+- 로그인 후: 데이터 입력 / 랜덤 입력 / 마지막 행 삭제 / 전체 삭제

@@ -24,6 +24,8 @@ function dispatch(spreadsheetId, sheetName, action, params) {
       return appendRandomRow(spreadsheetId, sheetName);
     case 'clearAllData':
       return clearAllData(spreadsheetId, sheetName);
+    case 'getData':
+      return getData(spreadsheetId, sheetName);
     default:
       return { status: 'error', message: '알 수 없는 action: ' + action };
   }
@@ -104,6 +106,26 @@ function clearAllData(spreadsheetId, sheetName) {
     }
     sheet.deleteRows(2, lastRow - 1);
     return { status: 'ok', message: (lastRow - 1) + '개 행 전체 삭제 완료' };
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+}
+
+/**
+ * 시트의 전체 데이터를 배열로 반환 (헤더 제외)
+ * @param {string} spreadsheetId
+ * @param {string} sheetName
+ */
+function getData(spreadsheetId, sheetName) {
+  try {
+    var sheet   = _getOrCreateSheet(spreadsheetId, sheetName);
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return { status: 'ok', rows: [] };
+    var values = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    var rows = values.map(function(r) {
+      return { timestamp: r[0] ? r[0].toString() : '', name: r[1], email: r[2], message: r[3] };
+    });
+    return { status: 'ok', rows: rows };
   } catch (err) {
     return { status: 'error', message: err.toString() };
   }
