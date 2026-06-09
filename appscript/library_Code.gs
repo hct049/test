@@ -1,156 +1,215 @@
 // ============================================================
-//  [test-Library 프로젝트에 붙여넣기]
-//  배포: 배포 > 새 배포 > 유형: 라이브러리
+//  우선순위 매트릭스 — Google Apps Script 라이브러리
+//  사용자의 Apps Script 프로젝트에 "라이브러리"로 추가해서 사용
+//  SHEET_ID는 사용자가 PropertiesService에 설정
 // ============================================================
 
-/**
- * 범용 디스패처 — action과 params를 받아 해당 함수를 실행합니다.
- * test-Test는 이 함수만 호출하며 내부 함수 목록을 알 필요가 없습니다.
- * @param {string} spreadsheetId
- * @param {string} sheetName
- * @param {string} action
- * @param {Object} params
- */
-function dispatch(spreadsheetId, sheetName, action, params) {
-  params = params || {};
-  switch (action) {
-    case 'ping':
-      return { status: 'ok', libraryPing: _ping(), pingError: '' };
-    case 'appendRow':
-      return appendRowToSheet(spreadsheetId, sheetName, params);
-    case 'deleteLastRow':
-      return deleteLastRow(spreadsheetId, sheetName);
-    case 'appendRandomRow':
-      return appendRandomRow(spreadsheetId, sheetName);
-    case 'clearAllData':
-      return clearAllData(spreadsheetId, sheetName);
-    case 'getData':
-      return getData(spreadsheetId, sheetName);
-    default:
-      return { status: 'error', message: '알 수 없는 action: ' + action };
+const TASKS_SHEET = "tasks";
+const COMPLETED_SHEET = "completed";
+const SETTINGS_SHEET = "settings";
+
+const TASK_HEADERS = [
+  "id", "title", "deadline", "deadlineTime", "importance", "note",
+  "repeat", "repeatInterval", "repeatWeekdays", "autoRepeat", "memos", "createdAt", "deletedAt"
+];
+const COMPLETED_HEADERS = [
+  "id", "title", "deadline", "deadlineTime", "importance", "note",
+  "repeat", "repeatInterval", "repeatWeekdays", "memos", "completedAt"
+];
+
+// ── Private Helpers (라이브러리 내부용) ─────────────────────
+function _getSheetId() {
+  const id = PropertiesService.getScriptProperties().getProperty("SHEET_ID");
+  if (!id) throw new Error("SHEET_ID not set. Call initPriorityMatrix(sheetId) first.");
+  return id;
+}
+
+function _getOrCreateSheet(name, headers) {
+  const ss = SpreadsheetApp.openById(_getSheetId());
+  let sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, headers.length)
+      .setBackground("#1a1a2e").setFontColor("#00D4AA").setFontWeight("bold");
   }
+  return sh;
 }
 
-function _ping() {
-  return 'pong from test-Library';
-}
-
-/**
- * 스프레드시트에 행 추가
- * @param {string} spreadsheetId
- * @param {string} sheetName
- * @param {Object} data - { name, email, message, timestamp }
- */
-function appendRowToSheet(spreadsheetId, sheetName, data) {
-  try {
-    var sheet = _getOrCreateSheet(spreadsheetId, sheetName);
-    _ensureHeader(sheet);
-    var timestamp = data.timestamp || new Date().toISOString();
-    sheet.appendRow([timestamp, data.name || '', data.email || '', data.message || '']);
-    return { status: 'ok', message: '저장 완료' };
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
-}
-
-/**
- * 마지막 데이터 행 삭제 (헤더 제외)
- * @param {string} spreadsheetId
- * @param {string} sheetName
- */
-function deleteLastRow(spreadsheetId, sheetName) {
-  try {
-    var sheet   = _getOrCreateSheet(spreadsheetId, sheetName);
-    var lastRow = sheet.getLastRow();
-    if (lastRow <= 1) {
-      return { status: 'ok', message: '삭제할 데이터 행이 없습니다.' };
-    }
-    sheet.deleteRow(lastRow);
-    return { status: 'ok', message: lastRow + '번째 행 삭제 완료' };
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
-}
-
-/**
- * 랜덤 10글자 데이터로 행 추가
- * @param {string} spreadsheetId
- * @param {string} sheetName
- */
-function appendRandomRow(spreadsheetId, sheetName) {
-  try {
-    var sheet = _getOrCreateSheet(spreadsheetId, sheetName);
-    _ensureHeader(sheet);
-    var name    = _randomString(10);
-    var email   = _randomString(6) + '@test.com';
-    var message = _randomString(10);
-    var ts      = new Date().toISOString();
-    sheet.appendRow([ts, name, email, message]);
-    return { status: 'ok', message: '랜덤 데이터 입력 완료', data: { name: name, email: email, message: message } };
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
-}
-
-/**
- * 헤더를 제외한 전체 데이터 행 삭제
- * @param {string} spreadsheetId
- * @param {string} sheetName
- */
-function clearAllData(spreadsheetId, sheetName) {
-  try {
-    var sheet   = _getOrCreateSheet(spreadsheetId, sheetName);
-    var lastRow = sheet.getLastRow();
-    if (lastRow <= 1) {
-      return { status: 'ok', message: '삭제할 데이터가 없습니다.' };
-    }
-    sheet.deleteRows(2, lastRow - 1);
-    return { status: 'ok', message: (lastRow - 1) + '개 행 전체 삭제 완료' };
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
-}
-
-/**
- * 시트의 전체 데이터를 배열로 반환 (헤더 제외)
- * @param {string} spreadsheetId
- * @param {string} sheetName
- */
-function getData(spreadsheetId, sheetName) {
-  try {
-    var sheet   = _getOrCreateSheet(spreadsheetId, sheetName);
-    var lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return { status: 'ok', rows: [] };
-    var values = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
-    var rows = values.map(function(r) {
-      return { timestamp: r[0] ? r[0].toString() : '', name: r[1], email: r[2], message: r[3] };
+function _sheetToObjects(sh, headers) {
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  return data.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => {
+      let v = row[i];
+      if (h === "repeatWeekdays" || h === "memos") {
+        try { v = JSON.parse(v || "[]"); } catch (e) { v = []; }
+      }
+      if (h === "importance" || h === "repeatInterval") v = Number(v) || 0;
+      obj[h] = v;
     });
-    return { status: 'ok', rows: rows };
+    return obj;
+  });
+}
+
+function _findRowById(sh, id) {
+  if (sh.getLastRow() < 2) return -1;
+  const ids = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().flat();
+  const sid = String(id);
+  const idx = ids.findIndex(v => String(v) === sid);
+  return idx === -1 ? -1 : idx + 2;
+}
+
+function _objectToRow(obj, headers) {
+  return headers.map(h => {
+    const v = obj[h];
+    if (Array.isArray(v)) return JSON.stringify(v);
+    return v === undefined ? "" : v;
+  });
+}
+
+// ── Public API (라이브러리 사용자가 호출) ──────────────────
+
+/**
+ * 초기화: SHEET_ID 설정. 사용자가 최초 1회 실행.
+ * @param {string} sheetId - Google Sheet ID
+ */
+function initPriorityMatrix(sheetId) {
+  PropertiesService.getScriptProperties().setProperty("SHEET_ID", sheetId);
+  _getOrCreateSheet(TASKS_SHEET, TASK_HEADERS);
+  _getOrCreateSheet(COMPLETED_SHEET, COMPLETED_HEADERS);
+  _getOrCreateSheet(SETTINGS_SHEET, ["key", "value"]);
+}
+
+function getTasks() {
+  const sh = _getOrCreateSheet(TASKS_SHEET, TASK_HEADERS);
+  return { ok: true, data: _sheetToObjects(sh, TASK_HEADERS) };
+}
+
+function addTask(task) {
+  const sh = _getOrCreateSheet(TASKS_SHEET, TASK_HEADERS);
+  task.id = task.id || String(Date.now());
+  task.createdAt = task.createdAt || new Date().toISOString();
+  sh.appendRow(_objectToRow(task, TASK_HEADERS));
+  return { ok: true, id: task.id };
+}
+
+function updateTask(task) {
+  const sh = _getOrCreateSheet(TASKS_SHEET, TASK_HEADERS);
+  const row = _findRowById(sh, task.id);
+  if (row === -1) return { ok: false, error: "Not found" };
+  sh.getRange(row, 1, 1, TASK_HEADERS.length).setValues([_objectToRow(task, TASK_HEADERS)]);
+  return { ok: true };
+}
+
+function deleteTask(id) {
+  const sh = _getOrCreateSheet(TASKS_SHEET, TASK_HEADERS);
+  const row = _findRowById(sh, id);
+  if (row === -1) return { ok: false, error: "Not found" };
+  sh.deleteRow(row);
+  return { ok: true };
+}
+
+function getCompleted() {
+  const sh = _getOrCreateSheet(COMPLETED_SHEET, COMPLETED_HEADERS);
+  return { ok: true, data: _sheetToObjects(sh, COMPLETED_HEADERS) };
+}
+
+function completeTask(id, completedTask) {
+  const shT = _getOrCreateSheet(TASKS_SHEET, TASK_HEADERS);
+  const row = _findRowById(shT, id);
+  if (row !== -1) shT.deleteRow(row);
+  const shC = _getOrCreateSheet(COMPLETED_SHEET, COMPLETED_HEADERS);
+  shC.appendRow(_objectToRow(completedTask, COMPLETED_HEADERS));
+  return { ok: true };
+}
+
+function undoComplete(id, task) {
+  const shC = _getOrCreateSheet(COMPLETED_SHEET, COMPLETED_HEADERS);
+  const row = _findRowById(shC, id);
+  if (row !== -1) shC.deleteRow(row);
+  const shT = _getOrCreateSheet(TASKS_SHEET, TASK_HEADERS);
+  shT.appendRow(_objectToRow(task, TASK_HEADERS));
+  return { ok: true };
+}
+
+function deleteCompleted(id) {
+  const sh = _getOrCreateSheet(COMPLETED_SHEET, COMPLETED_HEADERS);
+  const row = _findRowById(sh, id);
+  if (row === -1) return { ok: false, error: "Not found" };
+  sh.deleteRow(row);
+  return { ok: true };
+}
+
+function updateMemos(id, memos, sheetName) {
+  const isCompleted = sheetName === "completed";
+  const headers = isCompleted ? COMPLETED_HEADERS : TASK_HEADERS;
+  const sh = _getOrCreateSheet(isCompleted ? COMPLETED_SHEET : TASKS_SHEET, headers);
+  const row = _findRowById(sh, id);
+  if (row === -1) return { ok: false, error: "Not found" };
+  const memoCol = headers.indexOf("memos") + 1;
+  sh.getRange(row, memoCol).setValue(JSON.stringify(memos));
+  return { ok: true };
+}
+
+function getSettings() {
+  const ss = SpreadsheetApp.openById(_getSheetId());
+  let sh = ss.getSheetByName(SETTINGS_SHEET);
+  if (!sh) return { ok: true, data: {} };
+  const data = sh.getDataRange().getValues();
+  const result = {};
+  data.slice(1).forEach(row => { if (row[0] && row[0] !== "key") result[String(row[0])] = row[1]; });
+  return { ok: true, data: result };
+}
+
+function saveSettings(settings) {
+  const ss = SpreadsheetApp.openById(_getSheetId());
+  let sh = ss.getSheetByName(SETTINGS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(SETTINGS_SHEET);
+    sh.getRange(1, 1, 1, 2).setValues([["key", "value"]]);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, 2).setBackground("#1a1a2e").setFontColor("#00D4AA").setFontWeight("bold");
+  }
+  const existing = sh.getDataRange().getValues();
+  const keyToRow = {};
+  existing.forEach((row, i) => { if (i > 0 && row[0]) keyToRow[row[0]] = i + 1; });
+
+  Object.entries(settings).forEach(([k, v]) => {
+    const val = String(v);
+    if (keyToRow[k]) {
+      sh.getRange(keyToRow[k], 2).setValue(val);
+    } else {
+      sh.appendRow([k, val]);
+    }
+  });
+  return { ok: true };
+}
+
+// ── 범용 API 라우터 ──
+/**
+ * 모든 공개 API 함수를 이곳에서 라우팅
+ * @param {string} action
+ * @param {object} params
+ * @returns {object}
+ */
+function callPublicAPI(action, params) {
+  try {
+    if (action === "getTasks") return getTasks();
+    if (action === "getCompleted") return getCompleted();
+    if (action === "getSettings") return getSettings();
+    if (action === "addTask") return addTask(params.task);
+    if (action === "updateTask") return updateTask(params.task);
+    if (action === "deleteTask") return deleteTask(params.id);
+    if (action === "completeTask") return completeTask(params.id, params.completedTask);
+    if (action === "undoComplete") return undoComplete(params.id, params.task);
+    if (action === "deleteCompleted") return deleteCompleted(params.id);
+    if (action === "updateMemos") return updateMemos(params.id, params.memos, params.sheet);
+    if (action === "saveSettings") return saveSettings(params.settings);
+    return { error: "Unknown action: " + action };
   } catch (err) {
-    return { status: 'error', message: err.toString() };
+    return { error: err.message };
   }
-}
-
-// ── 내부 유틸 ─────────────────────────────────────────────
-
-function _getOrCreateSheet(spreadsheetId, sheetName) {
-  var ss    = SpreadsheetApp.openById(spreadsheetId);
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) sheet = ss.insertSheet(sheetName);
-  return sheet;
-}
-
-function _ensureHeader(sheet) {
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Timestamp', 'Name', 'Email', 'Message']);
-  }
-}
-
-function _randomString(len) {
-  var chars  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  var result = '';
-  for (var i = 0; i < len; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
 }

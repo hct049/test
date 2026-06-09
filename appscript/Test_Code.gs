@@ -1,53 +1,55 @@
 // ============================================================
-//  [test-Test 프로젝트에 붙여넣기]
-//  라이브러리 식별자: SpreadLib
-//  함수 종류는 라이브러리 내부에 캡슐화되어 있습니다.
+//  통합 템플릿 Code.gs — 컨테이너-바운드 (Sheet 내부)
+//  배포자가 1회 준비 후, 사용자는 사본 만들기만 하면 됨
+//  SHEET_ID 자동 감지 + 라이브러리 링크 (1회 수동 UI)
 // ============================================================
 
-var SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
-var SHEET_NAME     = 'Sheet1';
-
-// ── 범용 실행 함수 ────────────────────────────────────────
-// action 문자열을 라이브러리에 그대로 위임합니다.
-// 어떤 함수가 있는지는 이 파일에서 알 수 없습니다.
-function execute(action, params) {
-  return SpreadLib.dispatch(SPREADSHEET_ID, SHEET_NAME, action, params || {});
+// ── Menu 생성 (Sheet 열 때마다) ──────────────────────────
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu("Priority Matrix")
+    .addItem("🔄 최신 업데이트 적용", "applyLatestUpdate")
+    .addSeparator()
+    .addItem("📋 라이브러리 설정", "showLibraryInfo")
+    .addToUi();
 }
 
-// ── GET 핸들러 ────────────────────────────────────────────
-function doGet(e) {
-  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : 'ping';
-  var result;
+// ── 버튼: 최신 업데이트 적용 ──────────────────────────────
+function applyLatestUpdate() {
   try {
-    result = execute(action, e ? e.parameter : {});
+    const result = PriorityMatrixLibrary.updateToLatest();
+    const message = result.message + "\n\n현재 버전: " + result.version;
+    SpreadsheetApp.getUi().alert(message);
   } catch (err) {
-    result = { status: 'error', message: err.toString() };
+    SpreadsheetApp.getUi().alert("❌ 오류: " + err.message + "\n\n라이브러리가 추가되어 있는지 확인하세요.");
   }
-  return buildResponse(result);
 }
 
-// ── POST 핸들러 ───────────────────────────────────────────
-function doPost(e) {
-  var params = (e && e.parameter) ? e.parameter : {};
-  var result;
-  try {
-    result = execute(params.action || 'appendRow', params);
-  } catch (err) {
-    result = { status: 'error', message: err.toString() };
-  }
-  return buildResponse(result);
+// ── 버튼: 라이브러리 정보 표시 ─────────────────────────────
+function showLibraryInfo() {
+  const ui = SpreadsheetApp.getUi();
+  const sheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  const message = "Priority Matrix 설정\n\n" +
+    "📌 Sheet ID: " + sheetId + "\n\n" +
+    "🔄 \"최신 업데이트 적용\" 버튼을 클릭하여\n" +
+    "라이브러리 업데이트를 확인할 수 있습니다.";
+  ui.alert(message);
 }
 
-// ── 응답 생성 ─────────────────────────────────────────────
-function buildResponse(data) {
+// ── CORS 헬퍼 ──────────────────────────────────────────
+function _cors(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ── 에디터 직접 실행용 테스트 ─────────────────────────────
-function testPing()          { Logger.log(JSON.stringify(execute('ping'))); }
-function testAppendRow()     { Logger.log(JSON.stringify(execute('appendRow', { name: '테스트', email: 'test@test.com', message: '직접실행' }))); }
-function testDeleteLastRow() { Logger.log(JSON.stringify(execute('deleteLastRow'))); }
-function testAppendRandom()  { Logger.log(JSON.stringify(execute('appendRandomRow'))); }
-function testClearAllData()  { Logger.log(JSON.stringify(execute('clearAllData'))); }
+// ── Web App 진입점 (라이브러리의 범용 라우터 호출) ────────────────────
+function doGet(e) {
+  const action = e.parameter.action || "getTasks";
+  return _cors(PriorityMatrixLibrary.callPublicAPI(action, e.parameter));
+}
+
+function doPost(e) {
+  const body = JSON.parse(e.postData.contents);
+  return _cors(PriorityMatrixLibrary.callPublicAPI(body.action, body));
+}
